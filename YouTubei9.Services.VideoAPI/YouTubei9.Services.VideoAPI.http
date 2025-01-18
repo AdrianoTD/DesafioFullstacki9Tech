@@ -1,0 +1,6 @@
+@YouTubei9.Services.VideoAPI_HostAddress = http://localhost:5186
+
+GET {{YouTubei9.Services.VideoAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

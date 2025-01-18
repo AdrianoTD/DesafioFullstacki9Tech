@@ -3,8 +3,31 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.12.35707.178 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Frontend", "Frontend", "{54567294-7D11-4975-A78C-39410029CC1E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Gateway", "Gateway", "{DA835A88-0C15-4CD0-9F7B-1CB511559B99}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Integration", "Integration", "{FF17DC77-F970-47D1-A41B-9DA401A0BBDA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Services", "Services", "{D61440DB-433C-4274-9784-6922A5FF7DE4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YouTubei9.Services.VideoAPI", "YouTubei9.Services.VideoAPI\YouTubei9.Services.VideoAPI.csproj", "{648FCD7B-93F0-42C5-A4F6-48EE4C2A15C4}"
+EndProject
 Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{648FCD7B-93F0-42C5-A4F6-48EE4C2A15C4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{648FCD7B-93F0-42C5-A4F6-48EE4C2A15C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{648FCD7B-93F0-42C5-A4F6-48EE4C2A15C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{648FCD7B-93F0-42C5-A4F6-48EE4C2A15C4}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{648FCD7B-93F0-42C5-A4F6-48EE4C2A15C4} = {D61440DB-433C-4274-9784-6922A5FF7DE4}
 	EndGlobalSection
 EndGlobal
