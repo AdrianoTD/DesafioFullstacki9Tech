@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Newtonsoft.Json;
 using System.Globalization;
@@ -10,6 +11,7 @@ using System.Text.RegularExpressions;
 using YouTubei9.Services.VideoAPI.Data;
 using YouTubei9.Services.VideoAPI.Models;
 using YouTubei9.Services.VideoAPI.Models.DTO;
+using YouTubei9.Services.VideoAPI.Models.VideoInfoComponents;
 using YouTubei9.Services.VideoAPI.Models.VideoSearchComponents;
 using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
 using static System.Runtime.InteropServices.JavaScript.JSType;
@@ -20,7 +22,6 @@ namespace YouTubei9.Services.VideoAPI.Functions
     {
         private readonly AppDbContext _db;
         private readonly IConfiguration _configuration;
-        private static YTBVideoSearchDTO _videos = new YTBVideoSearchDTO();
 
         public VideoSearchFunctions(AppDbContext db, IConfiguration configuration)
         {
@@ -28,7 +29,7 @@ namespace YouTubei9.Services.VideoAPI.Functions
             _configuration = configuration;
         }
 
-        public async Task<string> SearchYoutubeVideos()
+        public async Task<string> SaveAllYoutubeVideos()
         {
             var apiKey = _configuration["YTB_API_KEY"];
 
@@ -46,11 +47,10 @@ namespace YouTubei9.Services.VideoAPI.Functions
 
                 var videos = JsonConvert.DeserializeObject<YTBVideoSearchDTO>(responseBody);
 
-                if(videos != null) _videos = videos;
 
+                var result = await SaveAllVideos(videos);
 
-                return responseBody;
-                //Console.WriteLine($"Resposta da API: {responseBody}");
+                return result;
             }
             catch (Exception ex)
             {
@@ -58,9 +58,54 @@ namespace YouTubei9.Services.VideoAPI.Functions
             }
         }
 
+        public async Task<string> GetYouTubeVideoDuration(string videoId)
+        {
+            var apiKey = _configuration["YTB_API_KEY"];
+
+            var url = $"https://www.googleapis.com/youtube/v3/videos?id={videoId}&part=contentDetails&key={apiKey}";
+
+            using var httpClient = new HttpClient();
+
+            try
+            {
+                var response = await httpClient.GetAsync(url);
+
+                response.EnsureSuccessStatusCode();
+
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                var videoInfo = JsonConvert.DeserializeObject<YTBVideoInfoDTO>(responseBody);
+
+                var videoDuration = ConvertDurationToString(videoInfo.Items[0].ContentDetails.Duration);
+
+                return videoDuration;
+            }
+            catch (Exception ex)
+            {
+                throw new ArgumentException("ERRO AO SE COMUNICAR COM A API: ", ex.Message);
+            }
+        }
+
+        public string ConvertDurationToString(string videoDuration)
+        {
+            var regex = new Regex(@"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?");
+            var match = regex.Match(videoDuration);
+
+            if (!match.Success)
+                throw new ArgumentException("FORMATO INVÁLIDO!");
+
+            int hours = match.Groups[1].Success ? int.Parse(match.Groups[1].Value) : 0;
+            int minutes = match.Groups[2].Success ? int.Parse(match.Groups[2].Value) : 0;
+            int seconds = match.Groups[3].Success ? int.Parse(match.Groups[3].Value) : 0;
+
+            TimeSpan timeSpan = new TimeSpan(hours, minutes, seconds);
+
+            return timeSpan.ToString(@"hh\:mm\:ss");
+        }
+
         public List<YTBVideoSearch> GetVideos()
         {
-            List<YTBVideoSearch> videosList = _db.YTBVideoSearches.ToList();
+            List<YTBVideoSearch> videosList = _db.YTBVideoSearches.Where(v => v.IsDeleted != true).ToList();
             List<ThumbnailItem> thumbsList = _db.YTBVideoSearchesThumbs.ToList();
 
             if(videosList == null || videosList.Count == 0 || thumbsList == null || thumbsList.Count == 0)
@@ -71,9 +116,9 @@ namespace YouTubei9.Services.VideoAPI.Functions
             return videosList;
         }
 
-        public YTBVideoSearch GetVideoById(int id)
+        public async Task<YTBVideoSearch> GetVideoById(int id)
         {
-            var video = _db.YTBVideoSearches.FirstOrDefault(v => v.Id == id);
+            var video = await _db.YTBVideoSearches.Where(v => v.IsDeleted != true).FirstOrDefaultAsync(v => v.Id == id);
 
             if(video == null)
             {
@@ -83,25 +128,17 @@ namespace YouTubei9.Services.VideoAPI.Functions
             return video;
         }
 
-        public void ValidateData()
+        public List<YTBVideoSearch> GetVideosByFilterFromDatabase(VideoFilters filter, string search)
         {
-            if (_videos == null || _videos.Items == null || _videos.Items.Count == 0)
-            {
-                throw new ArgumentException("REALIZE UMA BUSCA PRIMEIRO!");
-            }
-
-            else return;
-        }
-
-        public List<ResponseItem> GetVideosByFilter(VideoFilters filter, string search)
-        {
-            var filteredVideos = new List<ResponseItem>();
+            var listVideos = GetVideos();
+            var filteredVideos = new List<YTBVideoSearch>();
             search = search.ToLower();
 
             if (filter == VideoFilters.Title)
             {
-                filteredVideos = _videos.Items
-                    .Where(v => v.Snippet?.Title != null && v.Snippet.Title.ToLower().Contains(search))
+                filteredVideos = listVideos
+                    .Where(v => !string.IsNullOrEmpty(v.VideoTitle) && v.VideoTitle.ToLower()
+                    .Contains(search))
                     .ToList();
 
                 if (filteredVideos != null && filteredVideos.Count() > 0)
@@ -112,15 +149,40 @@ namespace YouTubei9.Services.VideoAPI.Functions
                 else throw new ArgumentException("NÃO FORAM ENCONTRADOS VÍDEOS COM ESTE TÍTULO!");
             }
 
-            /*else if (filter == VideoFilters.Duration) 
+            else if (filter == VideoFilters.Duration) 
             {
-                videos = _db.YTBVideoSearches.Where(u => u.Duration <= search).ToList();
-            }*/
+                if (search.Count(c => c == ':') == 1)
+                {
+                    search = $"00:{search}";
+                }
+
+                else if (search.Count(c => c == ':') == 0)
+                {
+                    search = $"00:00:{search}";
+                }
+
+                TimeSpan durationFilter = TimeSpan.Parse(search);
+
+                filteredVideos = listVideos
+                    .Where(v => !string.IsNullOrEmpty(v.Duration) &&
+                    TimeSpan.TryParse(v.Duration, out TimeSpan videoDuration) &&
+                    videoDuration <= durationFilter)
+                    .ToList();
+
+                if (filteredVideos != null && filteredVideos.Count() > 0)
+                {
+                    return filteredVideos;
+                }
+
+                else throw new ArgumentException("NÃO FORAM ENCONTRADOS VÍDEOS COM ATÉ ESTA DURAÇÃO DE TEMPO!");
+            }
 
             else if (filter == VideoFilters.Author)
             {
-                filteredVideos = _videos.Items
-                    .Where(u => u.Snippet?.ChannelTitle.ToLower() == search).ToList();
+                filteredVideos = listVideos
+                    .Where(v => !string.IsNullOrEmpty(v.ChannelTitle) && v.ChannelTitle.ToLower()
+                    .Contains(search))
+                    .ToList();
 
                 if (filteredVideos != null && filteredVideos.Count() > 0)
                 {
@@ -132,16 +194,14 @@ namespace YouTubei9.Services.VideoAPI.Functions
 
             else if (filter == VideoFilters.ByDate)
             {
-                string format = "dd-MM-yyyy";
-
                 if (DateTime.TryParseExact(search, "dd-MM-yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
                 {
-                    if (parsedDate > DateTime.Now) 
+                    if (parsedDate > DateTime.Now)
                     {
                         throw new ArgumentException("A DATA ULTRAPASSA O PERÍODO VÁLIDO!");
                     }
-                    filteredVideos = _videos.Items
-                    .Where(v => v.Snippet?.PublishedAt >= parsedDate && parsedDate.Year == 2025)
+                    filteredVideos = listVideos
+                    .Where(v => v.Date >= parsedDate && parsedDate.Year == 2025)
                     .ToList();
 
                     if (filteredVideos != null && filteredVideos.Count() > 0)
@@ -158,28 +218,31 @@ namespace YouTubei9.Services.VideoAPI.Functions
 
             //A função manterá a lógica referente a ordem. Caso tenha apenas 1 termo, filtrará apenas título. Caso tenha 2, filtrará título e nome do canal
             //(TITULO, NOME_CANAL, DESCRICAO)
-            else if (filter == VideoFilters.Q) 
+            else if (filter == VideoFilters.Q)
             {
                 search = Regex.Replace(search, @"\s*,\s*", ",");
 
                 var terms = search.Split(",");
 
-                if(terms.Length < 1 || terms.Length > 3)
+                if (terms.Length < 1 || terms.Length > 3)
                 {
                     throw new ArgumentException("QUANTIDADE INVÁLIDA DE TERMOS!");
                 }
 
                 var qSearch = (
-                    Title: terms.ElementAtOrDefault(0), 
-                    ChannelT: terms.ElementAtOrDefault(1) ?? string.Empty, 
+                    Title: terms.ElementAtOrDefault(0),
+                    ChannelT: terms.ElementAtOrDefault(1) ?? string.Empty,
                     Descrip: terms.ElementAtOrDefault(2) ?? string.Empty
                     );
 
-                filteredVideos = _videos.Items
+                filteredVideos = listVideos
                     .Where(v =>
-                        (string.IsNullOrEmpty(qSearch.Title) || v.Snippet?.Title.Contains(qSearch.Title, StringComparison.OrdinalIgnoreCase) == true) &&
-                        (string.IsNullOrEmpty(qSearch.ChannelT) || v.Snippet?.ChannelTitle.Contains(qSearch.ChannelT, StringComparison.OrdinalIgnoreCase) == true) &&
-                        (string.IsNullOrEmpty(qSearch.Descrip) || v.Snippet?.Description.Contains(qSearch.Descrip, StringComparison.OrdinalIgnoreCase) == true)
+                        (string.IsNullOrEmpty(qSearch.Title) || 
+                        v.VideoTitle?.Contains(qSearch.Title, StringComparison.OrdinalIgnoreCase) == true) &&
+                        (string.IsNullOrEmpty(qSearch.ChannelT) || 
+                        v.ChannelTitle?.Contains(qSearch.ChannelT, StringComparison.OrdinalIgnoreCase) == true) &&
+                        (string.IsNullOrEmpty(qSearch.Descrip) || 
+                        v.ChannelDescription?.Contains(qSearch.Descrip, StringComparison.OrdinalIgnoreCase) == true)
                     )
                     .ToList();
 
@@ -191,83 +254,85 @@ namespace YouTubei9.Services.VideoAPI.Functions
                 else throw new ArgumentException("NÃO FORAM ENCONTRADOS VÍDEOS COM OS FILTROS ESPECIFICADOS!");
             }
 
-            else throw new ArgumentException("UM ERRO INESPERADO ACONTECEU. TENTE NOVAMENTE MAIS TARDE!"); 
+            else throw new ArgumentException("UM ERRO INESPERADO ACONTECEU. TENTE NOVAMENTE MAIS TARDE!");
         }
 
-         public string SaveVideo(string videoId)
-         {
-             var video = _videos.Items
-                 .FirstOrDefault(v => v.Id?.VideoId == videoId);
+        public async Task<string> SaveAllVideos(YTBVideoSearchDTO allVideos)
+        {
+            if(allVideos == null || allVideos.Items == null) throw new ArgumentException("NÃO EXISTEM VÍDEOS A SEREM SALVOS!");
 
-            if (video == null) 
+            foreach (var video in allVideos.Items) 
             {
-                throw new ArgumentException("NÃO FOI ENCONTRADO UM VÍDEO COM ESTE ID!");
-            }
+                var exists = await _db.YTBVideoSearches
+                    .AnyAsync(v => v.VideoId == video.Id.VideoId);
 
-            
+                if (exists) continue;
 
-             var saveVideo = new YTBVideoSearch
-             {
-                 VideoId = video.Id.VideoId,
-                 VideoTitle = video.Snippet.Title,
-                 ChannelTitle = video.Snippet.ChannelTitle,
-                 ChannelDescription = video.Snippet.Description,
-                 Duration = string.Empty,
-                 Date = video.Snippet?.PublishedAt,
-                 Thumbnails = new List<ThumbnailItem>
+                var videoDuration = await GetYouTubeVideoDuration(video.Id.VideoId);
+
+                var saveVideo = new YTBVideoSearch
+                {
+                    VideoId = video?.Id?.VideoId ?? string.Empty,
+                    VideoTitle = video?.Snippet?.Title ?? string.Empty,
+                    ChannelTitle = video?.Snippet?.ChannelTitle ?? string.Empty,
+                    ChannelDescription = video?.Snippet?.Description ?? string.Empty,
+                    Duration = videoDuration ?? string.Empty,
+                    Date = video?.Snippet?.PublishedAt,
+                    Thumbnails = new List<ThumbnailItem>
                  {
                      new ThumbnailItem
                      {
                          ThumbType = ThumbnailType.Default,
-                         Url = video.Snippet.Thumbnails?.Default?.Url ?? string.Empty,
-                         Width = video.Snippet.Thumbnails?.Default?.Width ?? 0,
-                         Height = video.Snippet.Thumbnails?.Default?.Height ?? 0
+                         Url = video?.Snippet?.Thumbnails?.Default?.Url ?? string.Empty,
+                         Width = video?.Snippet?.Thumbnails?.Default?.Width ?? 0,
+                         Height = video?.Snippet?.Thumbnails?.Default?.Height ?? 0
                      },
 
                      new ThumbnailItem
                      {
                          ThumbType = ThumbnailType.Medium,
-                         Url = video.Snippet.Thumbnails?.Medium?.Url ?? string.Empty,
-                         Width = video.Snippet.Thumbnails?.Medium?.Width ?? 0,
-                         Height = video.Snippet.Thumbnails?.Medium?.Height ?? 0
+                         Url = video?.Snippet?.Thumbnails?.Medium?.Url ?? string.Empty,
+                         Width = video?.Snippet?.Thumbnails?.Medium?.Width ?? 0,
+                         Height = video?.Snippet?.Thumbnails?.Medium?.Height ?? 0
                      },
 
                      new ThumbnailItem
                      {
                          ThumbType = ThumbnailType.High,
-                         Url = video.Snippet.Thumbnails?.High?.Url ?? string.Empty,
-                         Width = video.Snippet.Thumbnails?.High?.Width ?? 0,
-                         Height = video.Snippet.Thumbnails?.High?.Height ?? 0
+                         Url = video?.Snippet?.Thumbnails?.High?.Url ?? string.Empty,
+                         Width = video?.Snippet?.Thumbnails?.High?.Width ?? 0,
+                         Height = video?.Snippet?.Thumbnails?.High?.Height ?? 0
                      },
 
                      new ThumbnailItem
                      {
                          ThumbType = ThumbnailType.Standard,
-                         Url = video.Snippet.Thumbnails?.Standard?.Url ?? string.Empty,
-                         Width = video.Snippet.Thumbnails?.Standard?.Width ?? 0,
-                         Height = video.Snippet.Thumbnails?.Standard?.Height ?? 0
+                         Url = video?.Snippet?.Thumbnails?.Standard?.Url ?? string.Empty,
+                         Width = video?.Snippet?.Thumbnails?.Standard?.Width ?? 0,
+                         Height = video?.Snippet?.Thumbnails?.Standard?.Height ?? 0
                      },
 
                      new ThumbnailItem
                      {
                          ThumbType = ThumbnailType.Maxres,
-                         Url = video.Snippet.Thumbnails?.Maxres?.Url ?? string.Empty,
-                         Width = video.Snippet.Thumbnails?.Maxres?.Width ?? 0,
-                         Height = video.Snippet.Thumbnails?.Maxres?.Height ?? 0
+                         Url = video?.Snippet?.Thumbnails?.Maxres?.Url ?? string.Empty,
+                         Width = video?.Snippet?.Thumbnails?.Maxres?.Width ?? 0,
+                         Height = video?.Snippet?.Thumbnails?.Maxres?.Height ?? 0
                      }
                  },
-                 IsDeleted = false
-             };
-            
-            _db.YTBVideoSearches.Add(saveVideo);
-            _db.SaveChanges();
+                    IsDeleted = false
+                };
 
-            return "VÍDEO INSERIDO COM SUCESSO!";
+                await _db.YTBVideoSearches.AddAsync(saveVideo);
+                await _db.SaveChangesAsync();
+            }
+
+            return "TODOS OS VÍDEOS FORAM SALVOS COM SUCESSO!";
         }
 
-        public string EditVideo(int id, VideoEditFields field, string data)
+        public async Task<string> EditVideo(int id, VideoEditFields field, string data)
         {
-            var video = GetVideoById(id);
+            var video = await GetVideoById(id);
 
             if(video == null) 
             {
@@ -290,14 +355,14 @@ namespace YouTubei9.Services.VideoAPI.Functions
             }
 
             _db.YTBVideoSearches.Update(video);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
 
             return ("INFORMAÇÕES DO VÍDEO ATUALIZADAS!");
         }
 
-        public string DeleteVideo(int id) 
+        public async Task<string> DeleteVideo(int id) 
         {
-            var video = GetVideoById(id);
+            var video = await GetVideoById(id);
 
             if (video == null)
             {
@@ -307,9 +372,16 @@ namespace YouTubei9.Services.VideoAPI.Functions
             video.IsDeleted = true;
 
             _db.YTBVideoSearches.Update(video);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
 
             return ("VÍDEO DELETADO COM SUCESSO!");
+        }
+
+        public void DeleteAllVideos()
+        {
+            var allVideos = _db.YTBVideoSearches.ToList();
+            _db.YTBVideoSearches.RemoveRange(allVideos);
+            _db.SaveChanges();
         }
     }
 }

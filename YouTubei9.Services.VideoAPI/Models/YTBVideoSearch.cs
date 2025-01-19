@@ -20,7 +20,7 @@ namespace YouTubei9.Services.VideoAPI.Models
     public enum VideoFilters
     {
         Title,
-        //Duration,
+        Duration,
         Author,
         ByDate,
         Q //Seguindo o padrão: (TITULO, NOME_CANAL, DESCRICAO)

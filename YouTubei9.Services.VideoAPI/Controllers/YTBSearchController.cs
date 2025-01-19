@@ -29,81 +29,14 @@ namespace YouTubei9.Services.VideoAPI.Controllers
         }
 
         [HttpGet]
-        [Route("YouTubeAPI/GetDotNet8Videos")]
-        public async Task<ActionResult<string>> SearchYouTubeVideos() 
+        [Route("YouTubeAPI/SaveAllDotNet8Videos")]
+        public async Task<ActionResult<string>> SaveAllYouTubeVideos()
         {
             try
             {
-                var response = await videoSearch.SearchYoutubeVideos();
+                var response = await videoSearch.SaveAllYoutubeVideos();
 
                 return Ok(response);
-            }
-
-            catch (ArgumentException ex) 
-            {
-                return StatusCode(500, ex.Message);
-            }
-        }
-
-        [HttpGet]
-        [Route("SaveVideo")]
-        public ActionResult SaveVideo(string videoId)
-        {
-
-            try
-            {
-                try
-                {
-                    videoSearch.ValidateData();
-                }
-
-                catch (ArgumentException ex)
-                {
-                    return StatusCode(400, ex.Message);
-                }
-
-                var result = videoSearch.SaveVideo(videoId);
-
-                return Ok(result);
-            }
-
-            catch (ArgumentException ex) 
-            {
-                return StatusCode(404, ex.Message);
-            }
-        }
-
-        [HttpGet]
-        [Route("EditVideo/{id}")]
-        public ActionResult<string> EditVideo(int id, VideoEditFields field, string data)
-        {
-            try
-            {
-                var response = videoSearch.EditVideo(id, field, data);
-
-                return response;
-            }
-
-            catch (ArgumentException ex)
-            {
-                return StatusCode(404, ex.Message);
-            }
-
-            catch (Exception ex) 
-            {
-                return StatusCode(500, "OCORREU UM ERRO INESPERADO E NÃO FOI POSSÍVEL EDITAR O VÍDEO!");
-            }
-        }
-
-        [HttpGet]
-        [Route("DeleteVideo")]
-        public ActionResult<string> DeleteVideo(int id) 
-        {
-            try
-            {
-                var response = videoSearch.DeleteVideo(id);
-
-                return response;
             }
 
             catch (ArgumentException ex)
@@ -113,14 +46,31 @@ namespace YouTubei9.Services.VideoAPI.Controllers
 
             catch (Exception ex)
             {
-                return StatusCode(500, "OCORREU UM ERRO INESPERADO E NÃO FOI POSSÍVEL EDITAR O VÍDEO!");
+                return StatusCode(500, ex.Message);
             }
         }
 
 
         [HttpGet]
+        [Route("YouTubeAPI/GetYTBVideoDuration")]
+        public async Task<ActionResult<YTBVideoInfoDTO>> GetYouTubeVideoDuration(string videoId)
+        {
+            try
+            {
+                var response = await videoSearch.GetYouTubeVideoDuration(videoId);
+
+                return Ok(response);
+            }
+
+            catch (ArgumentException ex)
+            {
+                return StatusCode(500, ex.Message);
+            }
+        }
+
+        [HttpGet]
         [Route("ListVideos")]
-        public ActionResult<List<YTBVideoSearch>> GetVideos() 
+        public ActionResult<List<YTBVideoSearch>> GetVideos()
         {
             try
             {
@@ -134,31 +84,22 @@ namespace YouTubei9.Services.VideoAPI.Controllers
                 return StatusCode(404, ex.Message);
             }
 
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 return StatusCode(500, "OCORREU UM ERRO AO BUSCAR SEUS VÍDEOS NO BANCO DE DADOS!");
             }
         }
 
+
         [HttpGet]
-        [Route("GetVideosFiltered/{filter}/{search}")]
-        public ActionResult<string> GetVideosByFilter(VideoFilters filter, string search)
+        [Route("GetVideosFilteredFromDatabase/{filter}/{search}")]
+        public async Task<ActionResult<string>> GetVideosByFilterFromDatabase(VideoFilters filter, string search)
         {
-            var videosList = new List<ResponseItem>();
+            var videosList = new List<YTBVideoSearch>();
 
             try
             {
-                try
-                {
-                    videoSearch.ValidateData();
-                }
-
-                catch (ArgumentException ex) 
-                {
-                    return StatusCode(400, ex.Message);
-                }
-
-                videosList = videoSearch.GetVideosByFilter(filter, search);
+                videosList = videoSearch.GetVideosByFilterFromDatabase(filter, search);
 
                 var options = new JsonSerializerOptions
                 {
@@ -170,7 +111,7 @@ namespace YouTubei9.Services.VideoAPI.Controllers
                 return jsonVideos;
             }
 
-            catch (ArgumentException ex) 
+            catch (ArgumentException ex)
             {
                 return StatusCode(400, ex.Message);
             }
@@ -179,7 +120,59 @@ namespace YouTubei9.Services.VideoAPI.Controllers
             {
                 return StatusCode(500, new { Message = "ERRO INTERNO DO SERVIDOR!" });
             }
+        }
 
+        [HttpGet]
+        [Route("EditVideo/{id}")]
+        public async Task<ActionResult<string>> EditVideo(int id, VideoEditFields field, string data)
+        {
+            try
+            {
+                var response = await videoSearch.EditVideo(id, field, data);
+
+                return response;
+            }
+
+            catch (ArgumentException ex)
+            {
+                return StatusCode(404, ex.Message);
+            }
+
+            catch (Exception ex)
+            {
+                return StatusCode(500, "OCORREU UM ERRO INESPERADO E NÃO FOI POSSÍVEL EDITAR O VÍDEO!");
+            }
+        }
+
+        [HttpGet]
+        [Route("DeleteVideo")]
+        public async Task<ActionResult<string>> DeleteVideo(int id)
+        {
+            try
+            {
+                var response = await videoSearch.DeleteVideo(id);
+
+                return response;
+            }
+
+            catch (ArgumentException ex)
+            {
+                return StatusCode(404, ex.Message);
+            }
+
+            catch (Exception ex)
+            {
+                return StatusCode(500, "OCORREU UM ERRO INESPERADO E NÃO FOI POSSÍVEL EDITAR O VÍDEO!");
+            }
+        }
+
+        [HttpGet]
+        [Route("DeleteAllVideos(For tests only)")]
+        public async Task<string> DeleteAllVideos()
+        {
+            videoSearch.DeleteAllVideos();
+
+            return "TODOS OS VÍDEOS DELETADOS";
         }
     }
 }

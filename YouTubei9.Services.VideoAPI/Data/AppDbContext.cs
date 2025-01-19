@@ -22,6 +22,12 @@ namespace YouTubei9.Services.VideoAPI.Data
                 .HasKey(e => e.Id);
             modelBuilder.Entity<ThumbnailItem>()
                 .HasKey(e => e.Id);
+
+            modelBuilder.Entity<YTBVideoSearch>()
+                .HasMany(e => e.Thumbnails)
+                .WithOne()
+                .HasForeignKey(t => t.YTBVideoSearchId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }
