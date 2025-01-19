@@ -22,7 +22,14 @@ namespace YouTubei9.Services.VideoAPI.Models
         Title,
         //Duration,
         Author,
-        ByDate
-        //Q
+        ByDate,
+        Q //Seguindo o padrão: (TITULO, NOME_CANAL, DESCRICAO)
+    }
+
+    public enum VideoEditFields
+    {
+        VideoTitle,
+        ChannelTitle,
+        ChannelDescription
     }
 }

@@ -8,6 +8,7 @@ using YouTubei9.Services.VideoAPI.Functions;
 using YouTubei9.Services.VideoAPI.Models;
 using YouTubei9.Services.VideoAPI.Models.DTO;
 using YouTubei9.Services.VideoAPI.Models.VideoSearchComponents;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace YouTubei9.Services.VideoAPI.Controllers
 {
@@ -73,25 +74,70 @@ namespace YouTubei9.Services.VideoAPI.Controllers
         }
 
         [HttpGet]
-        [Route("EditVideos")]
+        [Route("EditVideo/{id}")]
+        public ActionResult<string> EditVideo(int id, VideoEditFields field, string data)
+        {
+            try
+            {
+                var response = videoSearch.EditVideo(id, field, data);
+
+                return response;
+            }
+
+            catch (ArgumentException ex)
+            {
+                return StatusCode(404, ex.Message);
+            }
+
+            catch (Exception ex) 
+            {
+                return StatusCode(500, "OCORREU UM ERRO INESPERADO E NÃO FOI POSSÍVEL EDITAR O VÍDEO!");
+            }
+        }
 
         [HttpGet]
-        [Route("DeleteVideos")]
+        [Route("DeleteVideo")]
+        public ActionResult<string> DeleteVideo(int id) 
+        {
+            try
+            {
+                var response = videoSearch.DeleteVideo(id);
+
+                return response;
+            }
+
+            catch (ArgumentException ex)
+            {
+                return StatusCode(404, ex.Message);
+            }
+
+            catch (Exception ex)
+            {
+                return StatusCode(500, "OCORREU UM ERRO INESPERADO E NÃO FOI POSSÍVEL EDITAR O VÍDEO!");
+            }
+        }
 
 
         [HttpGet]
         [Route("ListVideos")]
-        public List<YTBVideoSearch> GetVideos() 
+        public ActionResult<List<YTBVideoSearch>> GetVideos() 
         {
             try
             {
-                List<YTBVideoSearch> videosList = _db.YTBVideoSearches.ToList();
+                var videosList = videoSearch.GetVideos();
+
                 return videosList;
             }
 
-            catch (Exception ex) { }
+            catch (ArgumentException ex)
+            {
+                return StatusCode(404, ex.Message);
+            }
 
-            return null;
+            catch (Exception ex) 
+            {
+                return StatusCode(500, "OCORREU UM ERRO AO BUSCAR SEUS VÍDEOS NO BANCO DE DADOS!");
+            }
         }
 
         [HttpGet]
