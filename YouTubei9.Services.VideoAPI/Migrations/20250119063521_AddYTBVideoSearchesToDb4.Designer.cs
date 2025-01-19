@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using YouTubei9.Services.VideoAPI.Data;
 
@@ -11,9 +12,11 @@ using YouTubei9.Services.VideoAPI.Data;
 namespace YouTubei9.Services.VideoAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250119063521_AddYTBVideoSearchesToDb4")]
+    partial class AddYTBVideoSearchesToDb4
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -42,7 +45,7 @@ namespace YouTubei9.Services.VideoAPI.Migrations
                     b.Property<int?>("Width")
                         .HasColumnType("int");
 
-                    b.Property<int?>("YTBVideoSearchId")
+                    b.Property<int>("YTBVideoSearchId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -99,7 +102,9 @@ namespace YouTubei9.Services.VideoAPI.Migrations
                 {
                     b.HasOne("YouTubei9.Services.VideoAPI.Models.YTBVideoSearch", null)
                         .WithMany("Thumbnails")
-                        .HasForeignKey("YTBVideoSearchId");
+                        .HasForeignKey("YTBVideoSearchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("YouTubei9.Services.VideoAPI.Models.YTBVideoSearch", b =>

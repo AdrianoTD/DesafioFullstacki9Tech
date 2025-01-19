@@ -16,8 +16,7 @@
       "launchUrl": "swagger",
       "applicationUrl": "http://localhost:5186",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "YTB_API_KEY": "AIzaSyA6ixkK5N2w9bOSxJxEVsJgXw-Gbtvo6jc"
+        "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
     "https": {
