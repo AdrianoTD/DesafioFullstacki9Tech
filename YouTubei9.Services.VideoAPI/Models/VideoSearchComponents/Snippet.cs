@@ -7,5 +7,8 @@
         public string? Title { get; set; }
         public string? Description { get; set; }
         public Thumbnails? Thumbnails { get; set; }
+        public string? ChannelTitle { get; set; }
+        public string? LiveBroadcastContent { get; set; }
+        public DateTime? PublishTime { get; set; }
     }
 }

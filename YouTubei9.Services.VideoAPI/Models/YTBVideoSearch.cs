@@ -12,8 +12,7 @@ namespace YouTubei9.Services.VideoAPI.Models
         public string ChannelTitle { get; set; } = string.Empty;
         public string ChannelDescription { get; set; } = string.Empty;
         public string Duration {  get; set; } = string.Empty;
-        public string Author {  get; set; } = string.Empty;
-        public DateTime Date {  get; set; } = DateTime.MinValue;
+        public DateTime? Date {  get; set; }
         public List<ThumbnailItem>? Thumbnails { get; set; }
         public bool IsDeleted { get; set; }
     };
@@ -21,9 +20,9 @@ namespace YouTubei9.Services.VideoAPI.Models
     public enum VideoFilters
     {
         Title,
-        Duration,
+        //Duration,
         Author,
-        ByDate,
-        Q
+        ByDate
+        //Q
     }
 }

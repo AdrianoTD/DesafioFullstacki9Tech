@@ -1,9 +1,12 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Configuration;
+using System.Text.Json;
 using YouTubei9.Services.VideoAPI.Data;
 using YouTubei9.Services.VideoAPI.Functions;
 using YouTubei9.Services.VideoAPI.Models;
+using YouTubei9.Services.VideoAPI.Models.DTO;
 using YouTubei9.Services.VideoAPI.Models.VideoSearchComponents;
 
 namespace YouTubei9.Services.VideoAPI.Controllers
@@ -31,6 +34,7 @@ namespace YouTubei9.Services.VideoAPI.Controllers
             try
             {
                 var response = await videoSearch.SearchYoutubeVideos();
+
                 return Ok(response);
             }
 
@@ -41,6 +45,42 @@ namespace YouTubei9.Services.VideoAPI.Controllers
         }
 
         [HttpGet]
+        [Route("SaveVideo")]
+        public ActionResult SaveVideo(string videoId)
+        {
+
+            try
+            {
+                try
+                {
+                    videoSearch.ValidateData();
+                }
+
+                catch (ArgumentException ex)
+                {
+                    return StatusCode(400, ex.Message);
+                }
+
+                var result = videoSearch.SaveVideo(videoId);
+
+                return Ok(result);
+            }
+
+            catch (ArgumentException ex) 
+            {
+                return StatusCode(404, ex.Message);
+            }
+        }
+
+        [HttpGet]
+        [Route("EditVideos")]
+
+        [HttpGet]
+        [Route("DeleteVideos")]
+
+
+        [HttpGet]
+        [Route("ListVideos")]
         public List<YTBVideoSearch> GetVideos() 
         {
             try
@@ -55,21 +95,38 @@ namespace YouTubei9.Services.VideoAPI.Controllers
         }
 
         [HttpGet]
-        [Route("DataSearch/{filter}/{search}")]
-        public ActionResult<List<YTBVideoSearch>> GetVideosByFilter(VideoFilters filter, string search)
+        [Route("GetVideosFiltered/{filter}/{search}")]
+        public ActionResult<string> GetVideosByFilter(VideoFilters filter, string search)
         {
-            var videosList = new List<YTBVideoSearch>();
+            var videosList = new List<ResponseItem>();
 
             try
             {
+                try
+                {
+                    videoSearch.ValidateData();
+                }
+
+                catch (ArgumentException ex) 
+                {
+                    return StatusCode(400, ex.Message);
+                }
+
                 videosList = videoSearch.GetVideosByFilter(filter, search);
 
-                return videosList;
+                var options = new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                };
+
+                string jsonVideos = JsonSerializer.Serialize(videosList, options);
+
+                return jsonVideos;
             }
 
             catch (ArgumentException ex) 
             {
-                return StatusCode(404, ex.Message);
+                return StatusCode(400, ex.Message);
             }
 
             catch (Exception ex)
@@ -78,19 +135,5 @@ namespace YouTubei9.Services.VideoAPI.Controllers
             }
 
         }
-
-        /*[HttpGet]
-        public List<ThumbnailItem> GetThumbs()
-        {
-            try
-            {
-                List<ThumbnailItem> thumbsList = _db.YTBVideoSearchesThumbs.ToList();
-                return thumbsList;
-            }
-
-            catch (Exception ex) { }
-
-            return null;
-        }*/
     }
 }
