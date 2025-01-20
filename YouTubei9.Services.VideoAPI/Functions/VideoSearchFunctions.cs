@@ -29,10 +29,8 @@ namespace YouTubei9.Services.VideoAPI.Functions
             _configuration = configuration;
         }
 
-        public async Task<string> SaveAllYoutubeVideos()
+        public async Task<string> SaveAllYoutubeVideos(string apiKey)
         {
-            var apiKey = _configuration["YTB_API_KEY"];
-
             var url = $"https://www.googleapis.com/youtube/v3/search?part=snippet&q=dotnet8&type=video&relevanceLanguage=pt&publishedAfter=2025-01-01T00:00:00Z&maxResults=15&key={apiKey}";
 
             using var httpClient = new HttpClient();
@@ -48,7 +46,7 @@ namespace YouTubei9.Services.VideoAPI.Functions
                 var videos = JsonConvert.DeserializeObject<YTBVideoSearchDTO>(responseBody);
 
 
-                var result = await SaveAllVideos(videos);
+                var result = await SaveAllVideos(videos, apiKey);
 
                 return result;
             }
@@ -58,10 +56,8 @@ namespace YouTubei9.Services.VideoAPI.Functions
             }
         }
 
-        public async Task<string> GetYouTubeVideoDuration(string videoId)
+        public async Task<string> GetYouTubeVideoDuration(string videoId, string apiKey)
         {
-            var apiKey = _configuration["YTB_API_KEY"];
-
             var url = $"https://www.googleapis.com/youtube/v3/videos?id={videoId}&part=contentDetails&key={apiKey}";
 
             using var httpClient = new HttpClient();
@@ -257,7 +253,7 @@ namespace YouTubei9.Services.VideoAPI.Functions
             else throw new ArgumentException("UM ERRO INESPERADO ACONTECEU. TENTE NOVAMENTE MAIS TARDE!");
         }
 
-        public async Task<string> SaveAllVideos(YTBVideoSearchDTO allVideos)
+        public async Task<string> SaveAllVideos(YTBVideoSearchDTO allVideos, string apiKey)
         {
             if(allVideos == null || allVideos.Items == null) throw new ArgumentException("NÃO EXISTEM VÍDEOS A SEREM SALVOS!");
 
@@ -268,7 +264,7 @@ namespace YouTubei9.Services.VideoAPI.Functions
 
                 if (exists) continue;
 
-                var videoDuration = await GetYouTubeVideoDuration(video.Id.VideoId);
+                var videoDuration = await GetYouTubeVideoDuration(video.Id.VideoId, apiKey);
 
                 var saveVideo = new YTBVideoSearch
                 {

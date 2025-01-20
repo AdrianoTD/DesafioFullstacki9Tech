@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Configuration;
@@ -32,9 +33,10 @@ namespace YouTubei9.Services.VideoAPI.Controllers
         [Route("YouTubeAPI/SaveAllDotNet8Videos")]
         public async Task<ActionResult<string>> SaveAllYouTubeVideos()
         {
+            var apiKey = HttpContext.Items["ApiKey"]?.ToString();
             try
             {
-                var response = await videoSearch.SaveAllYoutubeVideos();
+                var response = await videoSearch.SaveAllYoutubeVideos(apiKey);
 
                 return Ok(response);
             }
@@ -55,9 +57,10 @@ namespace YouTubei9.Services.VideoAPI.Controllers
         [Route("YouTubeAPI/GetYTBVideoDuration")]
         public async Task<ActionResult<YTBVideoInfoDTO>> GetYouTubeVideoDuration(string videoId)
         {
+            var apiKey = HttpContext.Items["ApiKey"]?.ToString();
             try
             {
-                var response = await videoSearch.GetYouTubeVideoDuration(videoId);
+                var response = await videoSearch.GetYouTubeVideoDuration(videoId, apiKey);
 
                 return Ok(response);
             }
