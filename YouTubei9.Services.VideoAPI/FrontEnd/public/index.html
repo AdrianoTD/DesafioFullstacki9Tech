@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Vídeos do YouTube</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chakra-ui/2.0.0/chakra.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+        }
+
+        .video-card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gestão de Vídeos do YouTube</h1>
+
+    <div id="api-key-section">
+        <input type="text" id="api-key" placeholder="Insira sua chave de API do YouTube" style="width: 300px; margin-right: 10px;">
+        <button onclick="fetchVideos()">Listar Vídeos</button>
+    </div>
+
+    <div id="filter-section" class="hidden" style="margin-top: 20px;">
+        <input type="text" id="filter" placeholder="Filtro (Ex: Título, Categoria)" style="width: 150px; margin-right: 10px;">
+        <input type="text" id="search" placeholder="Termo de busca" style="width: 200px; margin-right: 10px;">
+        <button onclick="fetchFilteredVideos()">Buscar</button>
+    </div>
+
+    <div id="videos-section" style="margin-top: 30px;">
+        <h2>Lista de Vídeos</h2>
+        <div id="videos-container"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = "http://localhost:5000/api/YTBSearchController";
+
+        function showFilterSection() {
+            document.getElementById('filter-section').classList.remove('hidden');
+        }
+
+        async function fetchVideos() {
+            const apiKey = document.getElementById('api-key').value;
+
+            if (!apiKey) {
+                alert('Por favor, insira sua chave de API.');
+                return;
+            }
+
+            try {
+                const response = await axios.get(`${API_BASE_URL}/ListVideos`, {
+                    headers: { Authorization: apiKey }
+                });
+
+                const videos = response.data;
+                displayVideos(videos);
+                showFilterSection();
+
+            } catch (error) {
+                alert(error.response?.data || 'Erro ao buscar vídeos.');
+            }
+        }
+
+        async function fetchFilteredVideos() {
+            const apiKey = document.getElementById('api-key').value;
+            const filter = document.getElementById('filter').value;
+            const search = document.getElementById('search').value;
+
+            if (!apiKey) {
+                alert('Por favor, insira sua chave de API.');
+                return;
+            }
+
+            if (!filter || !search) {
+                alert('Preencha os campos de filtro e busca.');
+                return;
+            }
+
+            try {
+                const response = await axios.get(`${API_BASE_URL}/GetVideosFilteredFromDatabase/${filter}/${search}`, {
+                    headers: { Authorization: apiKey }
+                });
+
+                const videos = JSON.parse(response.data);
+                displayVideos(videos);
+
+            } catch (error) {
+                alert(error.response?.data || 'Erro ao filtrar vídeos.');
+            }
+        }
+
+        function displayVideos(videos) {
+            const container = document.getElementById('videos-container');
+            container.innerHTML = '';
+
+            if (videos.length === 0) {
+                container.innerHTML = '<p>Nenhum vídeo encontrado.</p>';
+                return;
+            }
+
+            videos.forEach(video => {
+                const videoCard = document.createElement('div');
+                videoCard.className = 'video-card';
+
+                videoCard.innerHTML = `
+                    <h3>${video.title}</h3>
+                    <p>${video.description || 'Sem descrição disponível.'}</p>
+                `;
+
+                container.appendChild(videoCard);
+            });
+        }
+    </script>
+</body>
+</html>

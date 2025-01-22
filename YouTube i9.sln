@@ -11,18 +11,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Services", "Services", "{D6
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YouTubei9.Services.VideoAPI", "YouTubei9.Services.VideoAPI\YouTubei9.Services.VideoAPI.csproj", "{648FCD7B-93F0-42C5-A4F6-48EE4C2A15C4}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "FrontEnd", "FrontEnd", "{BBE1462A-1C1A-4DFB-8E82-462DAE68A761}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{A21B46B3-C398-42E1-A5A7-D4EDD9F54216}"
-	ProjectSection(SolutionItems) = preProject
-		C:\Users\T-GAMER\Desktop\App.js = C:\Users\T-GAMER\Desktop\App.js
-	EndProjectSection
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "public", "public", "{99D325C4-D4C2-43C2-9D2B-DA5C6A1081CD}"
-	ProjectSection(SolutionItems) = preProject
-		C:\Users\T-GAMER\Desktop\index.html = C:\Users\T-GAMER\Desktop\index.html
-	EndProjectSection
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,7 +27,5 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{648FCD7B-93F0-42C5-A4F6-48EE4C2A15C4} = {D61440DB-433C-4274-9784-6922A5FF7DE4}
-		{A21B46B3-C398-42E1-A5A7-D4EDD9F54216} = {BBE1462A-1C1A-4DFB-8E82-462DAE68A761}
-		{99D325C4-D4C2-43C2-9D2B-DA5C6A1081CD} = {BBE1462A-1C1A-4DFB-8E82-462DAE68A761}
 	EndGlobalSection
 EndGlobal
