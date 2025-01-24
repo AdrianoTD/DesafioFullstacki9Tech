@@ -1,114 +1,102 @@
-// App.js
-
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
 import {
   ChakraProvider,
   Box,
-  Button,
-  Input,
   Heading,
-  Stack,
+  Input,
+  Button,
+  VStack,
   Text,
-  Simplerid,
   useToast,
 } from "@chakra-ui/react";
 
-const API_BASE_URL = "http://localhost:5000/api/YTBSearchController"; // URL do seu backend
-
-function App() {
-  const [videos, setVideos] = useState([]); // Armazena os vídeos listados
+const App = () => {
   const [apiKey, setApiKey] = useState(""); // Armazena a chave de API
-  const [filter, setFilter] = useState(""); // Filtro para pesquisa
-  const [search, setSearch] = useState(""); // Texto de busca
-  const toast = useToast();
+  const [videos, setVideos] = useState([]); // Armazena os vídeos retornados
+  const [error, setError] = useState(null); // Armazena erros, se existirem
+  const toast = useToast(); // Exibe mensagens toast
 
-  // Função para listar todos os vídeos
-  const fetchVideos = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/ListVideos`, {
-        headers: { Authorization: apiKey },
+  // Função para autenticar (configurar o cabeçalho global)
+  const authenticate = () => {
+    if (apiKey.trim() === "") {
+      toast({
+        title: "Erro",
+        description: "Por favor, insira uma chave de API válida.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
       });
-      setVideos(response.data);
-    } catch (error) {
-      handleError(error);
+      return;
     }
-  };
 
-  // Função para filtrar vídeos
-  const fetchFilteredVideos = async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/GetVideosFilteredFromDatabase/${filter}/${search}`,
-        { headers: { Authorization: apiKey } }
-      );
-      setVideos(JSON.parse(response.data));
-    } catch (error) {
-      handleError(error);
-    }
-  };
-
-  // Função para lidar com erros
-  const handleError = (error) => {
-    const message = error.response?.data || "Erro ao se comunicar com o servidor!";
+    axios.defaults.headers.common["Authorization"] = apiKey.trim();
     toast({
-      title: "Erro",
-      description: message,
-      status: "error",
-      duration: 4000,
+      title: "Autenticado",
+      description: "Chave de API configurada com sucesso!",
+      status: "success",
+      duration: 3000,
       isClosable: true,
     });
   };
 
+  // Função para buscar vídeos
+  const fetchVideos = async () => {
+    console.log(axios.defaults.headers.common["Authorization"]);
+    try {
+      setError(null);
+      const response = await axios.get("https://localhost:7001/api/YTBSearch/ListVideos");
+      setVideos(response.data);
+    } catch (err) {
+      setError(err.response?.data || "Erro ao buscar vídeos");
+      toast({
+        title: "Erro",
+        description: err.response?.data || "Erro ao buscar vídeos.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
   return (
     <ChakraProvider>
-      <Box p={5} maxWidth="800px" mx="auto">
-        <Heading mb={4} textAlign="center">Gestão de Vídeos do YouTube</Heading>
-
-        {/* Input para a chave da API */}
-        <Stack spacing={3} mb={5}>
+      <Box p={5}>
+        <Heading mb={4} textAlign="center">
+          Busca de Vídeos do YouTube
+        </Heading>
+        <VStack spacing={4} align="stretch">
+          {/* Campo para inserir a chave de API */}
           <Input
             placeholder="Insira sua chave de API do YouTube"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
           />
-
-          <Button colorScheme="blue" onClick={fetchVideos} isDisabled={!apiKey}>
-            Listar Todos os Vídeos
+          {/* Botão para autenticar */}
+          <Button colorScheme="green" onClick={authenticate}>
+            Autenticar
           </Button>
-        </Stack>
-
-        {/* Filtros de busca */}
-        <Stack spacing={3} mb={5} direction="row">
-          <Input
-            placeholder="Filtro (Ex: Título, Categoria)"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-          <Input
-            placeholder="Termo de busca"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <Button colorScheme="green" onClick={fetchFilteredVideos} isDisabled={!apiKey}>
-            Buscar
+          {/* Botão para buscar vídeos */}
+          <Button colorScheme="blue" onClick={fetchVideos} isDisabled={!apiKey.trim()}>
+            Listar Vídeos
           </Button>
-        </Stack>
+        </VStack>
 
-        {/* Listagem dos vídeos */}
-        <SimpleGrid columns={[1, 2]} spacing={5}>
+        {/* Exibição de erros */}
+        {error && <Text color="red.500" mt={4}>{error}</Text>}
+
+        {/* Lista de vídeos */}
+        <Box mt={6}>
           {videos.map((video) => (
-            <Box key={video.id} p={4} borderWidth="1px" borderRadius="md" shadow="sm">
-              <Text fontWeight="bold">{video.title}</Text>
+            <Box key={video.id} p={4} borderWidth={1} borderRadius="md" mb={4}>
+              <Heading size="md">{video.title}</Heading>
               <Text>{video.description}</Text>
             </Box>
           ))}
-        </SimpleGrid>
-
-        {videos.length === 0 && <Text textAlign="center">Nenhum vídeo encontrado.</Text>}
+        </Box>
       </Box>
     </ChakraProvider>
   );
-}
+};
 
 export default App;

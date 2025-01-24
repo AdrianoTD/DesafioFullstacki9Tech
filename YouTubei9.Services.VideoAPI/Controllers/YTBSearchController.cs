@@ -30,7 +30,7 @@ namespace YouTubei9.Services.VideoAPI.Controllers
         }
 
         [HttpGet]
-        [Route("YouTubeAPI/SaveAllDotNet8Videos")]
+        [Route("SaveAllDotNet8Videos")]
         public async Task<ActionResult<string>> SaveAllYouTubeVideos()
         {
             var apiKey = HttpContext.Items["ApiKey"]?.ToString();
@@ -54,7 +54,7 @@ namespace YouTubei9.Services.VideoAPI.Controllers
 
 
         [HttpGet]
-        [Route("YouTubeAPI/GetYTBVideoDuration")]
+        [Route("GetYTBVideoDuration")]
         public async Task<ActionResult<YTBVideoInfoDTO>> GetYouTubeVideoDuration(string videoId)
         {
             var apiKey = HttpContext.Items["ApiKey"]?.ToString();

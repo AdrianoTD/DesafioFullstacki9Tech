@@ -12,6 +12,12 @@
 
         public async Task InvokeAsync(HttpContext httpContext)
         {
+            if (httpContext.Request.Method == "OPTIONS")
+            {
+                await _next(httpContext);
+                return;
+            }
+
             if (!httpContext.Request.Headers.ContainsKey(ApiKeyHeaderName))
             {
                 httpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -21,7 +27,6 @@
 
             var apiKey = httpContext.Request.Headers[ApiKeyHeaderName].ToString();
 
-            // Validação da chave via seu serviço de autenticação
             var isValid = await ValidateApiKeyAsync(apiKey);
 
             if (!isValid)
@@ -38,7 +43,6 @@
 
         private async Task<bool> ValidateApiKeyAsync(string apiKey)
         {
-            // Aqui você pode fazer a validação via seu controlador de autorização ou outro serviço
             var url = $"https://www.googleapis.com/youtube/v3/search?part=snippet&q=dotnet8&type=video&relevanceLanguage=pt&publishedAfter=2025-01-01T00:00:00Z&maxResults=15&key={apiKey}";
 
             using var httpClient = new HttpClient();
