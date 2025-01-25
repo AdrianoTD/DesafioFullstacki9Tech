@@ -8,7 +8,9 @@ using YouTubei9.Services.VideoAPI.Data;
 using YouTubei9.Services.VideoAPI.Functions;
 using YouTubei9.Services.VideoAPI.Models;
 using YouTubei9.Services.VideoAPI.Models.DTO;
+using YouTubei9.Services.VideoAPI.Models.Middlewares;
 using YouTubei9.Services.VideoAPI.Models.VideoSearchComponents;
+using YouTubei9.Services.VideoAPI.Services;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace YouTubei9.Services.VideoAPI.Controllers
@@ -17,16 +19,38 @@ namespace YouTubei9.Services.VideoAPI.Controllers
     [ApiController]
     public class YTBSearchController : ControllerBase
     {
+        private readonly ApiKeyValidationService _validationService;
         private readonly AppDbContext _db;
         private readonly IConfiguration _configuration;
         public VideoSearchFunctions videoSearch;
 
-        public YTBSearchController(AppDbContext db, IConfiguration configuration)
+        public YTBSearchController(AppDbContext db, IConfiguration configuration, ApiKeyValidationService validationService)
         {
             _db = db;
             _configuration = configuration;
+            _validationService = validationService;
 
             videoSearch = new VideoSearchFunctions(_db, configuration);
+        }
+
+        [HttpPost]
+        [Route("ValidateApiKey")]
+        public async Task<IActionResult> ValidateApiKey()
+        {
+            if (!HttpContext.Request.Headers.TryGetValue("Authorization", out var apiKey))
+            {
+                return Unauthorized("Chave de API não fornecida.");
+            }
+            bool isValid = await _validationService.ValidateApiKeyAsync(apiKey);
+
+            if (isValid)
+            {
+                return Ok(true);
+            }
+            else
+            {
+                return BadRequest("Chave de API inválida.");
+            }
         }
 
         [HttpGet]
@@ -73,13 +97,13 @@ namespace YouTubei9.Services.VideoAPI.Controllers
 
         [HttpGet]
         [Route("ListVideos")]
-        public ActionResult<List<YTBVideoSearch>> GetVideos()
+        public IActionResult GetVideos()
         {
             try
             {
                 var videosList = videoSearch.GetVideos();
 
-                return videosList;
+                return Ok(videosList);
             }
 
             catch (ArgumentException ex)
