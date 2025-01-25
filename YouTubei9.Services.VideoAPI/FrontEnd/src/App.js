@@ -1,15 +1,27 @@
 import React, { useState } from "react";
+import { Global } from "@emotion/react";
 import { useEffect } from "react";
 import axios from "axios";
 import {
   ChakraProvider,
   Box,
   Heading,
+  Flex,
   Input,
+  Select,
   Icon,
   Button,
   VStack,
   Text,
+  Link,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
   useToast,
 } from "@chakra-ui/react";
 import { FaStar, FaRegStar, FaSave, FaTrash } from "react-icons/fa";
@@ -24,17 +36,25 @@ const App = () => {
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchFilter, setSearchFilter] = useState("title");
   const [isLoading, setIsLoading] = useState(false);
   const [favorites, setFavorites] = useState({});
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedVideoId, setSelectedVideoId] = useState(null);
+  const baseUrl = "https://localhost:7001/api/"; 
+
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   useEffect(() => {
     const fetchVideosOnLoad = async() => {
       const savedApiKey = localStorage.getItem("apiKey");
+      const isAuthenticated = localStorage.getItem("isAuthenticated");
       const isAuthorized = localStorage.getItem("isAuthorized");
 
       if (savedApiKey && isAuthorized) {
         setApiKey(savedApiKey);
         axios.defaults.headers.common["Authorization"] = savedApiKey;
+        setIsAuthenticated(isAuthenticated);
         axios.defaults.headers.common["IsAuthorized"] = isAuthorized;
 
         try {
@@ -50,8 +70,35 @@ const App = () => {
 
   const toast = useToast();
 
+  const GlobalStyle = () => (
+    <Global
+      styles={`
+        body {
+          margin: 0;
+          padding: 0;
+          background-color: #121212;
+        }
+        * {
+          box-sizing: border-box;
+        }
+        .slick-slide > div {
+          padding: 0 0.1px;
+        }
+
+        .slick-list {
+          margin: 0 -10px;
+        }
+
+        .slick-track {
+          display: flex !important;
+          gap: 10px;
+        }
+      `}
+    />
+  );
+
   const carouselSettings = {
-    dots: true,
+    dots: false,
     infinite: true,
     speed: 500,
     slidesToShow: 3,
@@ -59,6 +106,7 @@ const App = () => {
     draggable: true,
     swipeToSlide: true,
     centerMode: false,
+    centerPadding: "15px",
     responsive: [
       {
         breakpoint: 1024,
@@ -72,6 +120,7 @@ const App = () => {
         settings: {
           slidesToShow: 1,
           slidesToScroll: 1,
+          centerMode: true,
         },
       },
       {
@@ -105,7 +154,7 @@ const App = () => {
       }
 
       const response = await axios.post(
-        "https://localhost:7001/api/YTBSearch/ValidateApiKey",
+        `${baseUrl}YTBSearch/ValidateApiKey`,
         {},
         {
           headers: {
@@ -125,21 +174,21 @@ const App = () => {
         });
         setIsAuthenticated(true);
         localStorage.setItem("apiKey", apiKey.trim());
+        localStorage.setItem("isAuthenticated", true);
         localStorage.setItem("isAuthorized", true);
         axios.defaults.headers.common["IsAuthorized"] = true;
 
         await fetchVideos();
 
-      } else {
-        throw new Error("Chave de API inválida.");
       }
     }
 
     catch (err) {
-      setError(err.message || "Erro ao validar a chave de API.");
+      const errorMessage = err.response?.data || "Erro ao autenticar: Chave de API inválida!";
+      //setError(err.response.data || "Erro ao validar a chave de API.");
       toast({
         title: "Erro na Autenticação",
-        description: err.message || "Erro ao validar a chave de API.",
+        description: errorMessage || "Erro ao validar a chave de API.",
         status: "error",
         duration: 3000,
         isClosable: true,
@@ -156,7 +205,7 @@ const App = () => {
   const fetchVideos = async () => {
     try {
       setError(null);
-      const response = await axios.get("https://localhost:7001/api/YTBSearch/ListVideos",
+      const response = await axios.get(`${baseUrl}YTBSearch/ListVideos`,
         {
           headers: {
             Authorization: apiKey.trim(),
@@ -179,6 +228,53 @@ const App = () => {
     }
   };
 
+  const deleteVideo = async (videoId) => {
+    try{
+      setError(null);
+      const response = await axios.get(`${baseUrl}YTBSearch/DeleteVideo`, {
+        params: { id: videoId },
+      });
+      toast({
+        title: "Vídeo Deletado",
+        description: `O vídeo com ID ${videoId} foi deletado com sucesso.`,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      setVideos((prevVideos) => prevVideos.filter((video) => video.id !== videoId));
+
+    } catch (err) {
+      setError(err.response?.data || "Não foi possível excluir este vídeo")
+      toast({
+        title: "Erro",
+        description: err.response?.data || "Erro ao excluir vídeo.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const openDeleteModal = (videoId) => {
+    setSelectedVideoId(videoId);
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (selectedVideoId) {
+      await deleteVideo(selectedVideoId);
+      setIsModalOpen(false);
+      setSelectedVideoId(null);
+    }
+  };
+  
+  // Cancelar a exclusão
+  const cancelDelete = () => {
+    setIsModalOpen(false);
+    setSelectedVideoId(null);
+  };
+
   const toggleFavorite = (videoId) => {
     setFavorites((prev) => ({
       ...prev,
@@ -186,17 +282,23 @@ const App = () => {
     }));
   };
 
+
   return (
     <ChakraProvider>
+      <GlobalStyle />
       <Box p={{ base: 4, md: 8 }} maxW="100%" mx="auto">
-        <Heading mb={4} textAlign="center">
-          Busca de Vídeos do YouTube
+        <Heading mb={4} textAlign="center" color="whiteAlpha.900">
+          Busca de Vídeos do{" "}
+          <Text as="span" color="red.500">
+            YouTube
+          </Text>
         </Heading>
         <VStack spacing={4} align="stretch" maxW="100%" mx="auto">
           {!isAuthenticated ? (
             <>
               <Input
                 placeholder="Insira sua chave de API do YouTube"
+                color="gray.200"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 size="sm"
@@ -212,17 +314,52 @@ const App = () => {
                 Autenticar
 
               </Button>
+
+              <Box textAlign="center" mt={2}>
+                <Link
+                  href="https://developers.google.com/youtube/v3/getting-started"
+                  color="red.500"
+                  _hover={{ textDecoration: "underline", color: "red.700" }}
+                  isExternal
+                >
+                  Como conseguir uma chave de API para o YouTube?
+                </Link>
+              </Box>
             </>
           ) : (
             <>
-              <Input
-                placeholder="Busque vídeos pelo título"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                size="sm"
-              />
+              <Flex 
+              direction={{ base: "column", md: "row" }}
+              gap={4} 
+              align="center"
+              justify="center"
+              width="100%">
+
+                <Select
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  size="sm"
+                  maxW={{ base: "100%", md: "150px" }}
+                  bg="gray.800"
+                  color="gray.200"
+                >
+                  <option style={{ backgroundColor: "#2d2d2d", color: "white" }} value="title">Título</option>
+                  <option style={{ backgroundColor: "#2d2d2d", color: "white" }} value="duration">Duração</option>
+                  <option style={{ backgroundColor: "#2d2d2d", color: "white" }} value="author">Nome do Canal</option>
+                </Select>
+                <Input
+                  placeholder="Busque vídeos pelo título, duração ou autor"
+                  color="gray.200"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  size="sm"
+                  flex="1"
+                  width="100%"
+                />
+              </Flex>
+
               <Button
-                colorScheme="blue" 
+                colorScheme="red" 
                 onClick={fetchVideos} 
                 size="md" 
                 minW="200px" 
@@ -251,8 +388,9 @@ const App = () => {
                   p={4}
                   borderWidth={1}
                   borderRadius="md"
+                  borderColor="gray.700"
                   textAlign="center"
-                  bg="gray.100"
+                  bg= "#FFFFFF1A"
                   mx={{ base: "5px", md: "15px" }}
                   width={{ base: "90%", sm: "300px", md: "260px" }}
                   overflow="hidden"
@@ -272,7 +410,7 @@ const App = () => {
                           alt={`Thumbnail de ${video.videoTitle}`}
                           style={{
                             width: "100%",
-                            height: "150px", // Define uma altura fixa
+                            height: "250px", // Define uma altura fixa
                             objectFit: "cover", // Garante que a imagem se ajuste sem distorção
                             borderRadius: "8px", // Arredonda as bordas da imagem
                           }}
@@ -284,7 +422,7 @@ const App = () => {
                       position="absolute"
                       top="10px"
                       right="10px"
-                      bg="rgba(255, 255, 255, 1)" // Fundo semitransparente
+                      bg="gray.200" // Fundo semitransparente
                       borderRadius="md"
                       p="5px"
                       cursor="pointer"
@@ -298,19 +436,19 @@ const App = () => {
                     >
                       <Icon
                         as={favorites[video.id] ? FaStar : FaRegStar}
-                        color={favorites[video.id] ? "yellow.400" : "gray.400"}
+                        color={favorites[video.id] ? "yellow.400" : "gray.600"}
                         w={6}
                         h={6}
                       />
                     </Box>
 
                     {/* Exibe o Título do Vídeo */}
-                    <Heading size="md" mb={2} noOfLines={1}>
+                    <Heading size="md" color="gray.200" mb={2} noOfLines={1}>
                       {video.videoTitle}
                     </Heading>
 
                     {/* Exibe a Duração do Vídeo */}
-                    <Text fontSize="sm" color="gray.600" mb={2} noOfLines={2}>
+                    <Text fontSize="sm" color="gray.200" mb={2} noOfLines={2}>
                       {video.duration}
                     </Text>
                   </Box>
@@ -354,7 +492,7 @@ const App = () => {
                         bg: "green.500",
                         color: "white",
                       }}
-                      onClick={() => console.log(`Abrir vídeo ${video.id}`)} // Lógica para abrir
+                      onClick={() => window.open(`https://www.youtube.com/watch?v=${video.videoId}`, "_blank")} // Lógica para abrir
                     >
                       <Icon as={FiExternalLink} w={5} h={5} />
                     </Box>
@@ -376,7 +514,7 @@ const App = () => {
                       bg: "red.500",
                       color: "white",
                     }}
-                    onClick={() => console.log(`Deletar vídeo ${video.id}`)}
+                    onClick={() => openDeleteModal(video.id)}
                   >
                     <Icon as={FaTrash} w={5} h={5}/>
                   </Box>
@@ -384,6 +522,39 @@ const App = () => {
               );
             })}
           </Slider>
+          <Modal isOpen={isModalOpen} onClose={cancelDelete} isCentered>
+            <ModalOverlay />
+            <ModalContent bg="gray.800" color="white">
+              <ModalHeader>Confirmação de Exclusão</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody>
+                Tem certeza que deseja excluir este vídeo? Esta ação não poderá ser desfeita.
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  mr={2} 
+                  bg="red.500" 
+                  color="white" 
+                  _hover={{
+                    bg: "white", 
+                    color: "red.500",
+                  }}
+                  onClick={confirmDelete}>
+                  Sim
+                </Button>
+                <Button  
+                  bg="white" 
+                  color="black" 
+                  _hover={{
+                    bg: "black", 
+                    color: "white",
+                  }}
+                  onClick={cancelDelete}>
+                  Não
+                </Button>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
         </Box>
       </Box>
     </ChakraProvider>
