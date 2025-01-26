@@ -48,6 +48,11 @@ namespace YouTubei9.Services.VideoAPI.Functions
 
                 var result = await SaveAllVideos(videos, apiKey);
 
+                if (string.IsNullOrEmpty(result))
+                {
+                    throw new ArgumentException("Erro ao buscar por novos vídeos!");
+                }
+
                 return result;
             }
             catch (Exception ex)
@@ -99,14 +104,19 @@ namespace YouTubei9.Services.VideoAPI.Functions
             return timeSpan.ToString(@"hh\:mm\:ss");
         }
 
-        public List<YTBVideoSearch> GetVideos()
+        public async Task<List<YTBVideoSearch>> GetVideos(string apiKey)
         {
             List<YTBVideoSearch> videosList = _db.YTBVideoSearches.Where(v => v.IsDeleted != true).ToList();
             List<ThumbnailItem> thumbsList = _db.YTBVideoSearchesThumbs.ToList();
 
-            if(videosList == null || videosList.Count == 0 || thumbsList == null || thumbsList.Count == 0)
+            if(videosList == null || videosList.Count == 0)
             {
-                throw new ArgumentException("NÃO FORAM ENCONTRADOS VÍDEOS NO SEU BANCO DE DADOS!");
+                var response = await SaveAllYoutubeVideos(apiKey);
+
+                if (string.IsNullOrEmpty(response))
+                {
+                    throw new ArgumentException("Não foi possível recuperar novos vídeos!");
+                }
             }
 
             return videosList;
@@ -124,9 +134,9 @@ namespace YouTubei9.Services.VideoAPI.Functions
             return video;
         }
 
-        public List<YTBVideoSearch> GetVideosByFilterFromDatabase(VideoFilters filter, string search)
+        public async Task<List<YTBVideoSearch>> GetVideosByFilterFromDatabase(VideoFilters filter, string search, string apiKey)
         {
-            var listVideos = GetVideos();
+            var listVideos = await GetVideos(apiKey);
             var filteredVideos = new List<YTBVideoSearch>();
             search = search.ToLower();
 

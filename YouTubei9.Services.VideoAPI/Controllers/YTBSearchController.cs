@@ -3,12 +3,15 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Configuration;
+using System.Net.Http;
 using System.Text.Json;
 using YouTubei9.Services.VideoAPI.Data;
 using YouTubei9.Services.VideoAPI.Functions;
 using YouTubei9.Services.VideoAPI.Models;
 using YouTubei9.Services.VideoAPI.Models.DTO;
+using YouTubei9.Services.VideoAPI.Models.Middlewares;
 using YouTubei9.Services.VideoAPI.Models.VideoSearchComponents;
+using YouTubei9.Services.VideoAPI.Services;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace YouTubei9.Services.VideoAPI.Controllers
@@ -17,20 +20,42 @@ namespace YouTubei9.Services.VideoAPI.Controllers
     [ApiController]
     public class YTBSearchController : ControllerBase
     {
+        private readonly ApiKeyValidationService _validationService;
         private readonly AppDbContext _db;
         private readonly IConfiguration _configuration;
         public VideoSearchFunctions videoSearch;
 
-        public YTBSearchController(AppDbContext db, IConfiguration configuration)
+        public YTBSearchController(AppDbContext db, IConfiguration configuration, ApiKeyValidationService validationService)
         {
             _db = db;
             _configuration = configuration;
+            _validationService = validationService;
 
             videoSearch = new VideoSearchFunctions(_db, configuration);
         }
 
+        [HttpPost]
+        [Route("ValidateApiKey")]
+        public async Task<IActionResult> ValidateApiKey()
+        {
+            if (!HttpContext.Request.Headers.TryGetValue("Authorization", out var apiKey))
+            {
+                return Unauthorized("Chave de API não fornecida.");
+            }
+            bool isValid = await _validationService.ValidateApiKeyAsync(apiKey);
+
+            if (isValid)
+            {
+                return Ok(true);
+            }
+            else
+            {
+                return BadRequest("Chave de API inválida.");
+            }
+        }
+
         [HttpGet]
-        [Route("YouTubeAPI/SaveAllDotNet8Videos")]
+        [Route("SaveAllDotNet8Videos")]
         public async Task<ActionResult<string>> SaveAllYouTubeVideos()
         {
             var apiKey = HttpContext.Items["ApiKey"]?.ToString();
@@ -54,7 +79,7 @@ namespace YouTubei9.Services.VideoAPI.Controllers
 
 
         [HttpGet]
-        [Route("YouTubeAPI/GetYTBVideoDuration")]
+        [Route("GetYTBVideoDuration")]
         public async Task<ActionResult<YTBVideoInfoDTO>> GetYouTubeVideoDuration(string videoId)
         {
             var apiKey = HttpContext.Items["ApiKey"]?.ToString();
@@ -73,13 +98,25 @@ namespace YouTubei9.Services.VideoAPI.Controllers
 
         [HttpGet]
         [Route("ListVideos")]
-        public ActionResult<List<YTBVideoSearch>> GetVideos()
+        public async Task<IActionResult> GetVideos()
         {
             try
             {
-                var videosList = videoSearch.GetVideos();
+                var apiKeyHeaderName = "Authorization";
 
-                return videosList;
+                if (HttpContext.Request.Headers.TryGetValue(apiKeyHeaderName, out var apiKey))
+                {
+                    var apiKeyValue = apiKey.ToString();
+                }
+
+                else
+                {
+                    throw new ArgumentException("Ocorreu um erro com sua chave de API! Tente se conectar novamente");
+                }
+
+                var videosList = await videoSearch.GetVideos(apiKey);
+
+                return Ok(videosList);
             }
 
             catch (ArgumentException ex)
@@ -95,23 +132,37 @@ namespace YouTubei9.Services.VideoAPI.Controllers
 
 
         [HttpGet]
-        [Route("GetVideosFilteredFromDatabase/{filter}/{search}")]
+        [Route("ListVideosByFilter")]
         public async Task<ActionResult<string>> GetVideosByFilterFromDatabase(VideoFilters filter, string search)
         {
             var videosList = new List<YTBVideoSearch>();
 
+            var apiKeyHeaderName = "Authorization";
+
+            if (HttpContext.Request.Headers.TryGetValue(apiKeyHeaderName, out var apiKey))
+            {
+                var apiKeyValue = apiKey.ToString();
+            }
+
+            else
+            {
+                throw new ArgumentException("Ocorreu um erro com sua chave de API! Tente se conectar novamente");
+            }
+
             try
             {
-                videosList = videoSearch.GetVideosByFilterFromDatabase(filter, search);
+                videosList = await videoSearch.GetVideosByFilterFromDatabase(filter, search, apiKey);
 
-                var options = new JsonSerializerOptions
+                /*var options = new JsonSerializerOptions
                 {
                     WriteIndented = true
                 };
 
                 string jsonVideos = JsonSerializer.Serialize(videosList, options);
 
-                return jsonVideos;
+                return jsonVideos;*/
+
+                return Ok(videosList);
             }
 
             catch (ArgumentException ex)

@@ -1,17 +1,36 @@
-﻿namespace YouTubei9.Services.VideoAPI.Models.Middlewares
+﻿using Microsoft.Extensions.DependencyInjection;
+using YouTubei9.Services.VideoAPI.Services;
+
+namespace YouTubei9.Services.VideoAPI.Models.Middlewares
 {
     public class ApiKeyMiddleware
     {
         private readonly RequestDelegate _next;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
         private const string ApiKeyHeaderName = "Authorization";
 
-        public ApiKeyMiddleware(RequestDelegate next)
+        public ApiKeyMiddleware(RequestDelegate next, IServiceScopeFactory serviceScopeFactory)
         {
             _next = next;
+            _serviceScopeFactory = serviceScopeFactory;
         }
 
         public async Task InvokeAsync(HttpContext httpContext)
         {
+            if (httpContext.Request.Method == "OPTIONS")
+            {
+                await _next(httpContext);
+                return;
+            }
+
+            if (httpContext.Request.Headers.TryGetValue("IsAuthorized", out var isAuthorizedHeader) &&
+            bool.TryParse(isAuthorizedHeader.ToString(), out var isAuthorized) && isAuthorized)
+            {
+                // Se "IsAuthorized" for true, permite a requisição
+                await _next(httpContext);
+                return;
+            }
+
             if (!httpContext.Request.Headers.ContainsKey(ApiKeyHeaderName))
             {
                 httpContext.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -21,8 +40,9 @@
 
             var apiKey = httpContext.Request.Headers[ApiKeyHeaderName].ToString();
 
-            // Validação da chave via seu serviço de autenticação
-            var isValid = await ValidateApiKeyAsync(apiKey);
+            using var scope = _serviceScopeFactory.CreateScope();
+            var validationService = scope.ServiceProvider.GetRequiredService<ApiKeyValidationService>();
+            var isValid = await validationService.ValidateApiKeyAsync(apiKey);
 
             if (!isValid)
             {
@@ -34,23 +54,6 @@
             httpContext.Items["ApiKey"] = apiKey;
 
             await _next(httpContext);
-        }
-
-        private async Task<bool> ValidateApiKeyAsync(string apiKey)
-        {
-            // Aqui você pode fazer a validação via seu controlador de autorização ou outro serviço
-            var url = $"https://www.googleapis.com/youtube/v3/search?part=snippet&q=dotnet8&type=video&relevanceLanguage=pt&publishedAfter=2025-01-01T00:00:00Z&maxResults=15&key={apiKey}";
-
-            using var httpClient = new HttpClient();
-            try
-            {
-                var response = await httpClient.GetAsync(url);
-                return response.IsSuccessStatusCode;
-            }
-            catch
-            {
-                return false;
-            }
         }
     }
 }
