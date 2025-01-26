@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Configuration;
+using System.Net.Http;
 using System.Text.Json;
 using YouTubei9.Services.VideoAPI.Data;
 using YouTubei9.Services.VideoAPI.Functions;
@@ -97,11 +98,23 @@ namespace YouTubei9.Services.VideoAPI.Controllers
 
         [HttpGet]
         [Route("ListVideos")]
-        public IActionResult GetVideos()
+        public async Task<IActionResult> GetVideos()
         {
             try
             {
-                var videosList = videoSearch.GetVideos();
+                var apiKeyHeaderName = "Authorization";
+
+                if (HttpContext.Request.Headers.TryGetValue(apiKeyHeaderName, out var apiKey))
+                {
+                    var apiKeyValue = apiKey.ToString();
+                }
+
+                else
+                {
+                    throw new ArgumentException("Ocorreu um erro com sua chave de API! Tente se conectar novamente");
+                }
+
+                var videosList = await videoSearch.GetVideos(apiKey);
 
                 return Ok(videosList);
             }
@@ -119,23 +132,37 @@ namespace YouTubei9.Services.VideoAPI.Controllers
 
 
         [HttpGet]
-        [Route("GetVideosFilteredFromDatabase/{filter}/{search}")]
+        [Route("ListVideosByFilter")]
         public async Task<ActionResult<string>> GetVideosByFilterFromDatabase(VideoFilters filter, string search)
         {
             var videosList = new List<YTBVideoSearch>();
 
+            var apiKeyHeaderName = "Authorization";
+
+            if (HttpContext.Request.Headers.TryGetValue(apiKeyHeaderName, out var apiKey))
+            {
+                var apiKeyValue = apiKey.ToString();
+            }
+
+            else
+            {
+                throw new ArgumentException("Ocorreu um erro com sua chave de API! Tente se conectar novamente");
+            }
+
             try
             {
-                videosList = videoSearch.GetVideosByFilterFromDatabase(filter, search);
+                videosList = await videoSearch.GetVideosByFilterFromDatabase(filter, search, apiKey);
 
-                var options = new JsonSerializerOptions
+                /*var options = new JsonSerializerOptions
                 {
                     WriteIndented = true
                 };
 
                 string jsonVideos = JsonSerializer.Serialize(videosList, options);
 
-                return jsonVideos;
+                return jsonVideos;*/
+
+                return Ok(videosList);
             }
 
             catch (ArgumentException ex)

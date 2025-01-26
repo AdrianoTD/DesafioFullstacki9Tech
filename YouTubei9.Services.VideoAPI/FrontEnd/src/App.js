@@ -24,13 +24,16 @@ import {
   useDisclosure,
   useToast,
 } from "@chakra-ui/react";
-import { FaStar, FaRegStar, FaSave, FaTrash } from "react-icons/fa";
+import { FaStar, FaRegStar, FaTrash, FaPlay } from "react-icons/fa";
 import { FiExternalLink } from "react-icons/fi";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 
+import Favorites from "./components/Favorites";
+
 const App = () => {
+  const [currentView, setCurrentView] = useState("home");
   const [apiKey, setApiKey] = useState("");
   const [videos, setVideos] = useState([]);
   const [error, setError] = useState(null);
@@ -38,12 +41,23 @@ const App = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchFilter, setSearchFilter] = useState("title");
   const [isLoading, setIsLoading] = useState(false);
-  const [favorites, setFavorites] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedVideoId, setSelectedVideoId] = useState(null);
-  const baseUrl = "https://localhost:7001/api/"; 
+
+  const [favorites, setFavorites] = useState(() => {
+    const storedFavorites = localStorage.getItem("favorites");
+    return storedFavorites ? JSON.parse(storedFavorites) : {};
+  });
+  
+  const baseUrl = "https://localhost:7001/api/";
 
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const isHomeView = currentView === "home";
+
+  useEffect(() => {
+    localStorage.setItem("favorites", JSON.stringify(favorites));
+  }, [favorites]);
 
   useEffect(() => {
     const fetchVideosOnLoad = async() => {
@@ -124,11 +138,11 @@ const App = () => {
         },
       },
       {
-        breakpoint: 480, // Smartphones pequenos
+        breakpoint: 480,
         settings: {
-          slidesToShow: 1, // Apenas 1 slide visível
+          slidesToShow: 1,
           slidesToScroll: 1,
-          centerMode: true, // Centraliza os slides
+          centerMode: true,
         },
       },
     ],
@@ -184,8 +198,7 @@ const App = () => {
     }
 
     catch (err) {
-      const errorMessage = err.response?.data || "Erro ao autenticar: Chave de API inválida!";
-      //setError(err.response.data || "Erro ao validar a chave de API.");
+      const errorMessage = err.response?.data || "Ocorreu um erro inesperado. Tente novamente mais tarde!";
       toast({
         title: "Erro na Autenticação",
         description: errorMessage || "Erro ao validar a chave de API.",
@@ -201,6 +214,13 @@ const App = () => {
     }
   };
 
+  const handleListVideos = async () => {
+    if (searchTerm.trim() === "") {
+      await fetchVideos();
+    } else {
+      await fetchVideosByFilter();
+    }
+  };
 
   const fetchVideos = async () => {
     try {
@@ -221,6 +241,47 @@ const App = () => {
       toast({
         title: "Erro",
         description: err.response?.data || "Erro ao buscar vídeos.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const fetchVideosByFilter = async () => {
+    try {
+      setError(null);
+
+      const filterMap = {
+        title: "Title",
+        duration: "Duration",
+        author: "Author",
+      };
+  
+      const mappedFilter = filterMap[searchFilter];
+
+      const response = await axios.get(`${baseUrl}YTBSearch/ListVideosByFilter`, {
+        headers: {
+          Authorization: apiKey.trim(),
+        },
+        params: {
+          filter: mappedFilter,
+          search: searchTerm.trim(),
+        },
+      });
+      setVideos(response.data);
+      toast({
+        title: "Busca realizada",
+        description: "Os vídeos filtrados foram carregados com sucesso.",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (err) {
+      setError(err.response?.data || "Erro ao buscar vídeos filtrados.");
+      toast({
+        title: "Erro na busca",
+        description: err.response?.data || "Erro ao buscar vídeos filtrados.",
         status: "error",
         duration: 3000,
         isClosable: true,
@@ -258,20 +319,19 @@ const App = () => {
 
   const openDeleteModal = (videoId) => {
     setSelectedVideoId(videoId);
-    setIsModalOpen(true);
+    setIsDeleteModalOpen(true);
   };
 
   const confirmDelete = async () => {
     if (selectedVideoId) {
       await deleteVideo(selectedVideoId);
-      setIsModalOpen(false);
+      setIsDeleteModalOpen(false);
       setSelectedVideoId(null);
     }
   };
   
-  // Cancelar a exclusão
   const cancelDelete = () => {
-    setIsModalOpen(false);
+    setIsDeleteModalOpen(false);
     setSelectedVideoId(null);
   };
 
@@ -286,13 +346,22 @@ const App = () => {
   return (
     <ChakraProvider>
       <GlobalStyle />
-      <Box p={{ base: 4, md: 8 }} maxW="100%" mx="auto">
-        <Heading mb={4} textAlign="center" color="whiteAlpha.900">
-          Busca de Vídeos do{" "}
-          <Text as="span" color="red.500">
-            YouTube
-          </Text>
-        </Heading>
+      <Box p={{ base: 4, md: 8 }} maxW="100%" width="100%" mx="auto">
+        {isHomeView ? (
+          <Heading mb={4} textAlign="center" color="whiteAlpha.900">
+            Busca de Vídeos do{" "}
+            <Text as="span" color="red.500">
+              YouTube
+            </Text>
+          </Heading>
+        ) : (
+          <Heading mb={4} textAlign="center" color="whiteAlpha.900">
+            Favoritos do{" "}
+            <Text as="span" color="red.500">
+              YouTube
+            </Text>
+          </Heading>
+        )}
         <VStack spacing={4} align="stretch" maxW="100%" mx="auto">
           {!isAuthenticated ? (
             <>
@@ -358,17 +427,44 @@ const App = () => {
                 />
               </Flex>
 
-              <Button
-                colorScheme="red" 
-                onClick={fetchVideos} 
-                size="md" 
-                minW="200px" 
-                width={{ base: "100%", sm: "300px", md: "400px" }} 
-                alignSelf="center"
-                isLoading={isLoading}>
               
-                Listar Vídeos
-              </Button>
+                <Flex justifyContent="center" gap={4} mb={4}>
+                  <Button
+                    colorScheme="red" 
+                    onClick={handleListVideos} 
+                    size="md" 
+                    minW="150px" 
+                    width={{ base: "100%", sm: "300px", md: "400px" }} 
+                    alignSelf="center"
+                    isLoading={isLoading}>
+                  
+                    Listar Vídeos
+                  </Button>
+                  {isHomeView ? (
+                    <Button 
+                      colorScheme="blue" 
+                      onClick={() => setCurrentView("Favorites")}
+                      size="md" 
+                      minW="150px" 
+                      width={{ base: "100%", sm: "300px", md: "400px" }} 
+                      alignSelf="center">
+                        
+                      Visualizar Favoritos
+                    </Button>
+                    ) : (
+                      <Button 
+                      colorScheme="blue" 
+                      onClick={() => setCurrentView("home")}
+                      size="md" 
+                      minW="150px" 
+                      width={{ base: "100%", sm: "300px", md: "400px" }} 
+                      alignSelf="center">
+                        
+                      Voltar para Home
+                    </Button>
+                  )}
+                </Flex>
+              
             </>
           )}
         </VStack>
@@ -376,153 +472,339 @@ const App = () => {
         {error && <Text color="red.500" mt={4} textAlign="center">{error}</Text>}
 
         <Box mt={6} overflow="hidden">
-          <Slider {...carouselSettings}>
-            {videos.map((video) => {
-              const defaultThumb = video.thumbnails?.find(
-                (thumb) => thumb.thumbType === 2
-              );
+          {currentView === "home" ? (
+            videos.length > 1 ? (
+            <Slider {...carouselSettings}>
+              {videos.map((video) => {
+                const defaultThumb = video.thumbnails?.find(
+                  (thumb) => thumb.thumbType === 2
+                );
 
-              return (
-                <Box
-                  key={video.id}
-                  p={4}
-                  borderWidth={1}
-                  borderRadius="md"
-                  borderColor="gray.700"
-                  textAlign="center"
-                  bg= "#FFFFFF1A"
-                  mx={{ base: "5px", md: "15px" }}
-                  width={{ base: "90%", sm: "300px", md: "260px" }}
-                  overflow="hidden"
-                  position="relative"
-                >
+                return (
                   <Box
-                    display="flex" // Habilita layout flex
-                    flexDirection="column" // Organiza os itens em coluna
-                    justifyContent="space-between" // Espaçamento automático entre os itens
-                    h={{ base: "auto", md: "350px" }} // Altura ajustável para diferentes tamanhos de tela
+                    key={video.id}
+                    p={4}
+                    borderWidth={1}
+                    borderRadius="md"
+                    borderColor="gray.700"
+                    textAlign="center"
+                    bg= "#FFFFFF1A"
+                    mx={{ base: "5px", md: "15px" }}
+                    width={{ base: "90%", sm: "300px", md: "260px" }}
+                    overflow="hidden"
+                    position="relative"
                   >
-                    {/* Exibe a Thumbnail no topo, caso exista */}
-                    {defaultThumb?.url && (
-                      <Box mb={4}>
-                        <img
-                          src={defaultThumb.url}
-                          alt={`Thumbnail de ${video.videoTitle}`}
-                          style={{
-                            width: "100%",
-                            height: "250px", // Define uma altura fixa
-                            objectFit: "cover", // Garante que a imagem se ajuste sem distorção
-                            borderRadius: "8px", // Arredonda as bordas da imagem
-                          }}
+                    <Box
+                      display="flex"
+                      flexDirection="column"
+                      justifyContent="space-between"
+                      h={{ base: "auto", md: "350px" }}
+                    >
+                      {/* Exibe a Thumbnail no topo, caso exista */}
+                      {defaultThumb?.url && (
+                        <Box mb={4}>
+                          <img
+                            src={defaultThumb.url}
+                            alt={`Thumbnail de ${video.videoTitle}`}
+                            style={{
+                              width: "100%",
+                              height: "250px",
+                              objectFit: "cover",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          {/* Botão de Play */}
+                          <Box
+                            position="absolute"
+                            top="40%"
+                            left="50%"
+                            transform="translate(-50%, -50%)"
+                            bg="whiteAlpha.800"
+                            borderRadius="full"
+                            w="80px"
+                            h="80px"
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                            boxShadow="lg"
+                            cursor="pointer"
+                            _hover={{
+                              bg: "whiteAlpha.900",
+                              transform: "translate(-50%, -50%) scale(1.1)",
+                              transition: "all 0.2s ease",
+                            }}
+                            onClick={() => {setSelectedVideoId(video.videoId); setIsModalOpen(true)} }
+                          >
+                            <Icon as={FaPlay} color="black" w={8} h={8} />
+                          </Box>
+                        </Box>
+                      )}
+
+                      <Box
+                        position="absolute"
+                        top="10px"
+                        right="10px"
+                        bg="gray.200"
+                        borderRadius="md"
+                        p="5px"
+                        cursor="pointer"
+                        onClick={() => toggleFavorite(video.id)}
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        boxShadow="md"
+                        w="32px"
+                        h="32px"
+                      >
+                        <Icon
+                          as={favorites[video.id] ? FaStar : FaRegStar}
+                          color={favorites[video.id] ? "yellow.400" : "gray.600"}
+                          w={6}
+                          h={6}
                         />
                       </Box>
-                    )}
+
+                      {/* Exibe o Título do Vídeo */}
+                      <Heading size="md" color="gray.200" mb={2} noOfLines={1}>
+                        {video.videoTitle}
+                      </Heading>
+
+                      <Text fontSize="xs" color="gray.400" mb={3} noOfLines={1}>
+                        {video.channelTitle}
+                      </Text>
+
+                      {/* Exibe a Duração do Vídeo */}
+                      <Text fontSize="sm" color="gray.200" mb={2} noOfLines={2}>
+                        {video.duration}
+                      </Text>
+                    </Box>
 
                     <Box
                       position="absolute"
-                      top="10px"
+                      bottom="10px"
+                      left="10px"
+                      display="flex"
+                      gap="10px"
+                      flexWrap="wrap"
+                    >
+                      {/* Ícone de Abrir */}
+                      <Box
+                        bg="rgba(255, 255, 255, 0.8)"
+                        borderRadius="md"
+                        p="5px"
+                        cursor="pointer"
+                        boxShadow="md"
+                        color="orange.400"
+                        transition="all 0.2s ease"
+                        _hover={{
+                          bg: "green.500",
+                          color: "white",
+                        }}
+                        onClick={() => window.open(`https://www.youtube.com/watch?v=${video.videoId}`, "_blank")}
+                      >
+                        <Icon as={FiExternalLink} w={5} h={5} />
+                      </Box>
+                    </Box>
+
+                    {/* Ícone de Lixeira */}
+                    <Box
+                      position="absolute"
+                      bottom="10px"
                       right="10px"
-                      bg="gray.200" // Fundo semitransparente
-                      borderRadius="md"
-                      p="5px"
-                      cursor="pointer"
-                      onClick={() => toggleFavorite(video.id)} // Alternar favorito
-                      display="flex" // Centraliza o ícone dentro do quadrado
-                      alignItems="center"
-                      justifyContent="center"
-                      boxShadow="md"
-                      w="32px" // Largura do quadrado
-                      h="32px" // Altura do quadrado
-                    >
-                      <Icon
-                        as={favorites[video.id] ? FaStar : FaRegStar}
-                        color={favorites[video.id] ? "yellow.400" : "gray.600"}
-                        w={6}
-                        h={6}
-                      />
-                    </Box>
-
-                    {/* Exibe o Título do Vídeo */}
-                    <Heading size="md" color="gray.200" mb={2} noOfLines={1}>
-                      {video.videoTitle}
-                    </Heading>
-
-                    {/* Exibe a Duração do Vídeo */}
-                    <Text fontSize="sm" color="gray.200" mb={2} noOfLines={2}>
-                      {video.duration}
-                    </Text>
-                  </Box>
-
-                  <Box
-                    position="absolute"
-                    bottom="10px"
-                    left="10px"
-                    display="flex"
-                    gap="10px"
-                    flexWrap="wrap"
-                  >
-                    {/* Ícone de Salvar */}
-                    <Box
                       bg="rgba(255, 255, 255, 0.8)"
                       borderRadius="md"
                       p="5px"
                       cursor="pointer"
                       boxShadow="md"
-                      color="blue.500"
+                      color="red.500"
                       transition="all 0.2s ease"
                       _hover={{
-                        bg: "blue.500",
+                        bg: "red.500",
                         color: "white",
                       }}
-                      onClick={() => console.log(`Salvar vídeo ${video.id}`)} // Lógica para salvar
+                      onClick={() => openDeleteModal(video.id)}
                     >
-                      <Icon as={FaSave} w={5} h={5} />
-                    </Box>
-
-                    {/* Ícone de Abrir */}
-                    <Box
-                      bg="rgba(255, 255, 255, 0.8)"
-                      borderRadius="md"
-                      p="5px"
-                      cursor="pointer"
-                      boxShadow="md"
-                      color="green.500"
-                      transition="all 0.2s ease"
-                      _hover={{
-                        bg: "green.500",
-                        color: "white",
-                      }}
-                      onClick={() => window.open(`https://www.youtube.com/watch?v=${video.videoId}`, "_blank")} // Lógica para abrir
-                    >
-                      <Icon as={FiExternalLink} w={5} h={5} />
+                      <Icon as={FaTrash} w={5} h={5}/>
                     </Box>
                   </Box>
-
-                  {/* Ícone de Lixeira */}
+                );
+              })}
+            </Slider>
+            ) : (
+              videos.map((video) => {
+                const defaultThumb = video.thumbnails?.find(
+                  (thumb) => thumb.thumbType === 2
+                );
+          
+                return (
                   <Box
-                    position="absolute"
-                    bottom="10px"
-                    right="10px"
-                    bg="rgba(255, 255, 255, 0.8)"
+                    key={video.id}
+                    p={4}
+                    borderWidth={1}
                     borderRadius="md"
-                    p="5px"
-                    cursor="pointer"
-                    boxShadow="md"
-                    color="red.500"
-                    transition="all 0.2s ease"
-                    _hover={{
-                      bg: "red.500",
-                      color: "white",
-                    }}
-                    onClick={() => openDeleteModal(video.id)}
+                    borderColor="gray.700"
+                    textAlign="center"
+                    bg= "#FFFFFF1A"
+                    mx="auto"
+                    width={{ base: "90%", sm: "80%", md: "60%", lg: "50%" }}
+                    maxW="600px"
+                    overflow="hidden"
+                    position="relative"
                   >
-                    <Icon as={FaTrash} w={5} h={5}/>
+                    <Box
+                      display="flex"
+                      flexDirection="column"
+                      justifyContent="space-between"
+                      h={{ base: "auto", md: "400px" }}
+                    >
+                      {/* Exibe a Thumbnail no topo, caso exista */}
+                      {defaultThumb?.url && (
+                        <Box mb={4}>
+                          <img
+                            src={defaultThumb.url}
+                            alt={`Thumbnail de ${video.videoTitle}`}
+                            style={{
+                              width: "100%",
+                              height: "250px",
+                              objectFit: "cover",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          {/* Botão de Play */}
+                          <Box
+                            position="absolute"
+                            top="35%"
+                            left="50%"
+                            transform="translate(-50%, -50%)"
+                            bg="whiteAlpha.800"
+                            borderRadius="full"
+                            w="80px"
+                            h="80px"
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                            boxShadow="lg"
+                            cursor="pointer"
+                            _hover={{
+                              bg: "whiteAlpha.900",
+                              transform: "translate(-50%, -50%) scale(1.1)",
+                              transition: "all 0.2s ease",
+                            }}
+                            onClick={() => {setSelectedVideoId(video.videoId); setIsModalOpen(true)}}
+                          >
+                            <Icon as={FaPlay} color="black" w={8} h={8} />
+                          </Box>
+                        </Box>
+                      )}
+
+                      <Box
+                        position="absolute"
+                        top="10px"
+                        right="10px"
+                        bg="gray.200"
+                        borderRadius="md"
+                        p="5px"
+                        cursor="pointer"
+                        onClick={() => toggleFavorite(video.id)}
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        boxShadow="md"
+                        w="32px"
+                        h="32px"
+                      >
+                        <Icon
+                          as={favorites[video.id] ? FaStar : FaRegStar}
+                          color={favorites[video.id] ? "yellow.400" : "gray.600"}
+                          w={6}
+                          h={6}
+                        />
+                      </Box>
+
+                      {/* Exibe o Título do Vídeo */}
+                      <Heading size="md" color="gray.200" mb={2} noOfLines={1}>
+                        {video.videoTitle}
+                      </Heading>
+
+                      <Text fontSize="xs" color="gray.400" mb={3} noOfLines={1}>
+                        {video.channelTitle}
+                      </Text>
+
+                      {/* Exibe a Duração do Vídeo */}
+                      <Text fontSize="sm" color="gray.200" mb={2} noOfLines={2}>
+                        {video.duration}
+                      </Text>
+                    </Box>
+
+                    <Box
+                      position="absolute"
+                      bottom="10px"
+                      left="10px"
+                      display="flex"
+                      gap="10px"
+                      flexWrap="wrap"
+                    >
+                      
+                      {/* Ícone de Abrir */}
+                      <Box
+                        bg="rgba(255, 255, 255, 0.8)"
+                        borderRadius="md"
+                        p="5px"
+                        cursor="pointer"
+                        boxShadow="md"
+                        color="orange.400"
+                        transition="all 0.2s ease"
+                        _hover={{
+                          bg: "green.500",
+                          color: "white",
+                        }}
+                        onClick={() => window.open(`https://www.youtube.com/watch?v=${video.videoId}`, "_blank")}
+                      >
+                        <Icon as={FiExternalLink} w={5} h={5} />
+                      </Box>
+                    </Box>
+
+                    {/* Ícone de Lixeira */}
+                    <Box
+                      position="absolute"
+                      bottom="10px"
+                      right="10px"
+                      bg="rgba(255, 255, 255, 0.8)"
+                      borderRadius="md"
+                      p="5px"
+                      cursor="pointer"
+                      boxShadow="md"
+                      color="red.500"
+                      transition="all 0.2s ease"
+                      _hover={{
+                        bg: "red.500",
+                        color: "white",
+                      }}
+                      onClick={() => openDeleteModal(video.id)}
+                    >
+                      <Icon as={FaTrash} w={5} h={5}/>
+                    </Box>
                   </Box>
-                </Box>
-              );
-            })}
-          </Slider>
-          <Modal isOpen={isModalOpen} onClose={cancelDelete} isCentered>
+                );
+              })
+            )
+          ) : (
+            <Favorites
+              videos={videos.filter((video) => favorites[video.id])}
+              favorites={favorites}
+              toggleFavorite={toggleFavorite}
+              setSelectedVideoId={setSelectedVideoId}
+              selectedVideoId={selectedVideoId}
+              setIsModalOpen={setIsModalOpen}
+              setCurrentView={setCurrentView}
+              openDeleteModal={openDeleteModal}
+              isModalOpen={isModalOpen}
+              isDeleteModalOpen={isDeleteModalOpen}
+              cancelDelete={cancelDelete}
+              confirmDelete={confirmDelete}
+            />
+          )}
+          <Modal isOpen={isDeleteModalOpen} onClose={cancelDelete} isCentered>
             <ModalOverlay />
             <ModalContent bg="gray.800" color="white">
               <ModalHeader>Confirmação de Exclusão</ModalHeader>
@@ -553,6 +835,30 @@ const App = () => {
                   Não
                 </Button>
               </ModalFooter>
+            </ModalContent>
+          </Modal>
+          <Modal isOpen={isModalOpen} onClose={() => {setSelectedVideoId(null); setIsModalOpen(false)}} size="4xl" isCentered>
+            <ModalOverlay />
+            <ModalContent>
+              <ModalCloseButton />
+              <ModalBody p={0}>
+                <Box position="relative" pb="56.25%" h="0"> {/* Proporção 16:9 */}
+                  <iframe
+                    src={`https://www.youtube.com/embed/${selectedVideoId}`}
+                    title="YouTube Video Player"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      height: "100%",
+                      border: "none",
+                    }}
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                  ></iframe>
+                </Box>
+              </ModalBody>
             </ModalContent>
           </Modal>
         </Box>
