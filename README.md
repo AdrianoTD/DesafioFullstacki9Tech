@@ -100,5 +100,5 @@ Certifique-se de ter as seguintes ferramentas instaladas:
 
 ---
 
-Pronto! Seu projeto está configurado e em execução. Em caso de dúvidas, consulte a documentação oficial das tecnologias utilizadas ou entre em contato com o responsável pelo projeto.
+Em caso de dúvidas, consulte a documentação oficial das tecnologias utilizadas ou entre em contato com o responsável pelo projeto.
 
